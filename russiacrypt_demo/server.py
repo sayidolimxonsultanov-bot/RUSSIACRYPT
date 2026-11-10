@@ -93,14 +93,35 @@ def init_db():
                 PRIMARY KEY (user_id, hour_key)
             );
         """)
-        admin = conn.execute("SELECT id FROM users WHERE role='admin' LIMIT 1").fetchone()
-        if not admin:
-            username = os.environ.get("ADMIN_USERNAME", "owner").strip() or "owner"
-            password = os.environ.get("ADMIN_PASSWORD")
-            generated = False
+        admin = conn.execute("SELECT id, username FROM users WHERE role='admin' LIMIT 1").fetchone()
+        configured_password = os.environ.get("ADMIN_PASSWORD")
+        configured_username = os.environ.get("ADMIN_USERNAME")
+
+        if admin:
+            # When ADMIN_PASSWORD is configured in the hosting dashboard, make it
+            # the known password for the existing admin account on every restart.
+            # The secret itself is never printed to the logs.
+            if configured_password:
+                username = (configured_username or admin["username"]).strip() or admin["username"]
+                conflict = conn.execute(
+                    "SELECT id FROM users WHERE username=? COLLATE NOCASE AND id<>?",
+                    (username, admin["id"])
+                ).fetchone()
+                if conflict:
+                    raise RuntimeError("ADMIN_USERNAME уже занят другим аккаунтом. Укажите другое имя администратора в переменных Render.")
+                salt, digest = hash_password(configured_password)
+                conn.execute(
+                    "UPDATE users SET username=?, salt=?, password_hash=? WHERE id=?",
+                    (username, salt, digest, admin["id"])
+                )
+                print("[RUSSIACRYPT] Пароль существующего администратора обновлён из переменной ADMIN_PASSWORD.")
+                print(f"Логин администратора: {username}")
+        else:
+            username = (configured_username or "owner").strip() or "owner"
+            password = configured_password
+            generated = not bool(password)
             if not password:
-                password = secrets.token_urlsafe(15)
-                generated = True
+                password = secrets.token_urlsafe(18)
             salt, digest = hash_password(password)
             try:
                 conn.execute(
@@ -110,12 +131,11 @@ def init_db():
                 print("\n[RUSSIACRYPT] Создана админ-учётная запись.")
                 print(f"Логин: {username}")
                 if generated:
-                    print(f"Одноразово сгенерированный пароль: {password}")
-                    print("Сохраните его в безопасном месте. Пароль не будет показан повторно.\n")
+                    print("Пароль создан случайно и не будет показан повторно. Задайте ADMIN_PASSWORD в настройках Render, чтобы установить известный пароль.")
                 else:
-                    print("Пароль взят из переменной окружения ADMIN_PASSWORD.\n")
+                    print("Пароль установлен через переменную окружения ADMIN_PASSWORD.")
             except sqlite3.IntegrityError:
-                raise RuntimeError("Имя ADMIN_USERNAME уже занято обычным аккаунтом. Удалите russiacrypt.db и перезапустите демо или выберите другое ADMIN_USERNAME.")
+                raise RuntimeError("Имя ADMIN_USERNAME уже занято обычным аккаунтом. Укажите другое имя ADMIN_USERNAME в настройках Render.")
 
 
 def money_to_units(value, field="amount") -> int:
