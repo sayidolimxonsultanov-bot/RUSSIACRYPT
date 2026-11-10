@@ -1,0 +1,13 @@
+
+services:
+  - type: web
+    name: russiacrypt-demo
+    runtime: python
+    plan: free
+    buildCommand: python -m compileall -q .
+    startCommand: python server.py
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: COOKIE_SECURE
+        value: "true"
