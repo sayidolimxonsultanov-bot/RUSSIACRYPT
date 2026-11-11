@@ -209,7 +209,7 @@ class AppHandler(BaseHTTPRequestHandler):
                 FROM sessions s JOIN users u ON u.id=s.user_id
                 WHERE s.token_hash=?
             """, (token_hash,)).fetchone()
-            if not row:
+            if not row:  
                 return None
             if row["expires_at"] < int(time.time()):
                 conn.execute("DELETE FROM sessions WHERE token_hash=?", (token_hash,))
