@@ -1,8 +1,51 @@
-const state = { user: null, csrf: '', authMode: 'login', view: 'overview', adjustAction: 'add', users: [] };
+const state = {
+    user: null,
+    csrf: '',
+    authMode: 'login',
+    view: 'overview',
+    adjustAction: 'add',
+    users: [],
+    marketPriceCents: 15000,
+    marketHistory: []
+};
 const $ = (id) => document.getElementById(id);
 const fmtEUR = (cents) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format((Number(cents) || 0) / 100);
 const fmtCoin = (units) => `${((Number(units) || 0) / 100).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} RUC`;
-const fmtDate = (value) => {
+async function loadMarket() {
+    try {
+        const response = await fetch('/api/market');
+        const data = await response.json();
+
+        if (!response.ok || !Number.isFinite(Number(data.price_cents))) {
+            return;
+        }
+
+        state.marketPriceCents = Number(data.price_cents);
+        state.marketHistory = Array.isArray(data.history) ? data.history : [];
+
+        const priceText = fmtEUR(state.marketPriceCents);
+
+        [
+            'overview-price',
+            'overview-asset-price',
+            'market-price',
+            'market-detail-price',
+            'trade-price',
+            'trade-summary-price'
+        ].forEach(id => {
+            const element = document.getElementById(id);
+            if (element) element.textContent = priceText;
+        });
+
+        if (state.user) updateBalances();
+
+        updateTradeQuote();
+        drawCharts();
+
+    } catch (error) {
+        console.error('Ошибка загрузки цены RUCOIN:', error);
+    }
+}const fmtDate = (value) => {
   try { return new Date(value).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }); }
   catch { return value || '—'; }
 };
@@ -97,9 +140,10 @@ function showAuth() {
 
 function updateBalances() {
   if (!state.user) return;
-  const total = state.user.eur_cents + state.user.rucoin_cents * 150;
+ 
   $('eur-balance').textContent = fmtEUR(state.user.eur_cents);
-  $('coin-balance').innerHTML = `${esc(fmtCoin(state.user.rucoin_cents).replace(' RUC',''))} <small>RUC</small>`;
+  $('coin-balance').innerHTML = `${esc(fmtCoin(state.user.rucoin_cents).replconst total = state.user.eur_cents +
+    Math.round(state.user.rucoin_cents * state.marketPriceCents / 100);ace(' RUC',''))} <small>RUC</small>`;
   $('portfolio-value').textContent = fmtEUR(total);
   $('deposit-balance').textContent = fmtEUR(state.user.eur_cents);
   $('withdraw-balance').textContent = fmtEUR(state.user.eur_cents);
@@ -125,7 +169,9 @@ function updateTradeQuote() {
   const side = $('trade-side')?.value || 'buy';
   const raw = Number($('trade-amount')?.value || 0);
   const coinUnits = Math.max(0, Math.round(raw * 100));
-  const eurCents = coinUnits * 150;
+  const eurCents = Math.round(
+    coinUnits * state.marketPriceCents / 100
+);
   $('trade-total').textContent = fmtEUR(eurCents);
   $('trade-total-label').textContent = side === 'buy' ? 'К оплате' : 'К зачислению';
   $('trade-available').textContent = side === 'buy' ? fmtEUR(state.user.eur_cents) : fmtCoin(state.user.rucoin_cents);
@@ -169,13 +215,14 @@ async function refreshMeAndHistory() {
   }
 }
 
-async function submitTrade(event) {
+async function submitTrade() {
   event.preventDefault();
   const amount = $('trade-amount').value;
   const side = $('trade-side').value;
   try {
     const result = await api('/api/trade', { side, amount });
-    await refreshMeAndHistory();
+   await loadMarket();
+await refreshMeAndHistory();
     setMessage('trade-message', result.message);
     toast(result.message);
   } catch (error) {
@@ -304,10 +351,20 @@ function drawChart(canvasId, data, color = '#8d79ff') {
   ctx.fillStyle = '#5bd7d2'; ctx.fill();
 }
 function drawCharts() {
-  const series = [148.1,148.5,148.0,149.0,148.7,149.2,149.0,149.7,149.3,149.8,149.5,150.0,149.7,150.2,149.9,150.0];
-  drawChart('overview-chart', series);
-  drawChart('market-chart', series.concat([150.1,149.8,150.0,150.0]));
+  const series = state.marketHistory.map(
+    item => Number(item.price_cents) / 100
+);
+
+if (series.length === 0) {
+    series.push(state.marketPriceCents / 100);
 }
+
+if (series.length === 1) {
+    series.unshift(series[0]);
+}
+ 
+}drawChart('overview-chart', series);
+drawChart('market-chart', series);
 
 // Navigation and forms
 $('auth-form').addEventListener('submit', submitAuth);
