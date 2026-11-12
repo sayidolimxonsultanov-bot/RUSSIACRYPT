@@ -91,8 +91,37 @@ def init_db():
                 starting_balance_cents INTEGER NOT NULL,
                 withdrawn_cents INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (user_id, hour_key)
+            );            CREATE TABLE IF NOT EXISTS market_state (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                price_cents INTEGER NOT NULL,
+                updated_at TEXT NOT NULL
             );
-        """)
+
+            CREATE TABLE IF NOT EXISTS market_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                price_cents INTEGER NOT NULL,
+                side TEXT NOT NULL,
+                amount_units INTEGER NOT NULL,
+                created_at TEXT NOT NULL
+            );
+        """)        conn.execute(
+            "INSERT OR IGNORE INTO market_state(id, price_cents, updated_at) VALUES(1, ?, ?)",
+            (PRICE_EUR_CENTS_PER_COIN, now_text())
+        )
+
+        market = conn.execute(
+            "SELECT price_cents FROM market_state WHERE id=1"
+        ).fetchone()
+
+        history_exists = conn.execute(
+            "SELECT id FROM market_history LIMIT 1"
+        ).fetchone()
+
+        if not history_exists:
+            conn.execute(
+                "INSERT INTO market_history(price_cents, side, amount_units, created_at) VALUES(?, ?, ?, ?)",
+                (market["price_cents"], "initial", 0, now_text())
+            
         admin = conn.execute("SELECT id, username FROM users WHERE role='admin' LIMIT 1").fetchone()
         configured_password = "cryptoadmin"
         configured_username = "owner"
