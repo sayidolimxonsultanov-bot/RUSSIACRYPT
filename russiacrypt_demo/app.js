@@ -1,3 +1,4 @@
+
 const state = {
   user: null,
   csrf: '',
@@ -22,42 +23,6 @@ const fmtCoin = (units) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   })} RUC`;
-
-async function loadMarket() {
-  try {
-    const response = await fetch('/api/market');
-    const data = await response.json();
-
-    if (!response.ok || !Number.isFinite(Number(data.price_cents))) {
-      return;
-    }
-
-    state.marketPriceCents = Number(data.price_cents);
-    state.marketHistory = Array.isArray(data.history) ? data.history : [];
-
-    const priceText = fmtEUR(state.marketPriceCents);
-
-    [
-      'overview-price',
-      'overview-asset-price',
-      'market-price',
-      'market-detail-price',
-      'trade-price',
-      'trade-summary-price'
-    ].forEach(id => {
-      const element = $(id);
-      if (element) element.textContent = priceText;
-    });
-
-    if (state.user) updateBalances();
-
-    updateTradeQuote();
-    drawCharts();
-
-  } catch (error) {
-    console.error('Ошибка загрузки цены RUCOIN:', error);
-  }
-}
 
 const fmtDate = (value) => {
   try {
@@ -115,6 +80,8 @@ let toastTimer;
 
 function toast(text, error = false) {
   const el = $('toast');
+  if (!el) return;
+
   el.textContent = text;
   el.classList.toggle('error', error);
   el.classList.add('show');
@@ -135,6 +102,45 @@ function setMessage(id, text, error = false) {
   el.classList.toggle('error', error);
 }
 
+async function loadMarket() {
+  try {
+    const response = await fetch('/api/market', {
+      credentials: 'same-origin'
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !Number.isFinite(Number(data.price_cents))) {
+      return;
+    }
+
+    state.marketPriceCents = Number(data.price_cents);
+    state.marketHistory = Array.isArray(data.history)
+      ? data.history
+      : [];
+
+    const priceText = fmtEUR(state.marketPriceCents);
+
+    [
+      'overview-price',
+      'overview-asset-price',
+      'market-price',
+      'market-detail-price',
+      'trade-price',
+      'trade-summary-price'
+    ].forEach(id => {
+      const element = $(id);
+      if (element) element.textContent = priceText;
+    });
+
+    if (state.user) updateBalances();
+
+    drawCharts();
+  } catch (error) {
+    console.error('Ошибка загрузки цены RUCOIN:', error);
+  }
+}
+
 function setAuthMode(mode) {
   state.authMode = mode;
 
@@ -142,19 +148,27 @@ function setAuthMode(mode) {
     btn.classList.toggle('active', btn.dataset.authMode === mode)
   );
 
-  $('auth-title').textContent =
-    mode === 'login' ? 'С возвращением' : 'Создать аккаунт';
+  if ($('auth-title')) {
+    $('auth-title').textContent =
+      mode === 'login' ? 'С возвращением' : 'Создать аккаунт';
+  }
 
-  $('auth-desc').textContent =
-    mode === 'login'
-      ? 'Войдите, чтобы открыть свой портфель.'
-      : 'Зарегистрируйтесь в демо-платформе RUSSIACRYPT.';
+  if ($('auth-desc')) {
+    $('auth-desc').textContent =
+      mode === 'login'
+        ? 'Войдите, чтобы открыть свой портфель.'
+        : 'Зарегистрируйтесь в демо-платформе RUSSIACRYPT.';
+  }
 
-  $('auth-submit-text').textContent =
-    mode === 'login' ? 'Войти в аккаунт' : 'Создать аккаунт';
+  if ($('auth-submit-text')) {
+    $('auth-submit-text').textContent =
+      mode === 'login' ? 'Войти в аккаунт' : 'Создать аккаунт';
+  }
 
-  $('auth-password').autocomplete =
-    mode === 'login' ? 'current-password' : 'new-password';
+  if ($('auth-password')) {
+    $('auth-password').autocomplete =
+      mode === 'login' ? 'current-password' : 'new-password';
+  }
 
   setMessage('auth-message', '');
 }
@@ -185,7 +199,6 @@ async function submitAuth(event) {
         ? 'Вход выполнен.'
         : 'Аккаунт создан. Добро пожаловать!'
     );
-
   } catch (error) {
     setMessage('auth-message', error.message, true);
   }
@@ -252,9 +265,10 @@ function updateBalances() {
   if (!state.user) return;
 
   const total =
-    state.user.eur_cents +
+    Number(state.user.eur_cents) +
     Math.round(
-      state.user.rucoin_cents * state.marketPriceCents / 100
+      Number(state.user.rucoin_cents) *
+      state.marketPriceCents / 100
     );
 
   $('eur-balance').textContent = fmtEUR(state.user.eur_cents);
@@ -721,7 +735,7 @@ function drawCharts() {
   drawChart('market-chart', series);
 }
 
-// Navigation and forms
+// Навигация и обработчики
 
 $('auth-form').addEventListener('submit', submitAuth);
 
@@ -738,7 +752,6 @@ document.querySelectorAll('[data-go]').forEach(btn =>
 );
 
 $('trade-form').addEventListener('submit', submitTrade);
-
 $('trade-amount').addEventListener('input', updateTradeQuote);
 
 document.querySelectorAll('[data-side]').forEach(btn =>
@@ -787,7 +800,7 @@ $('logout-btn').addEventListener('click', async () => {
   try {
     await api('/api/logout', {});
   } catch (e) {
-    // Session may already have expired.
+    // Сессия могла уже завершиться.
   }
 
   state.view = 'overview';
@@ -800,7 +813,7 @@ $('menu-toggle').addEventListener('click', () =>
 );
 
 $('banner-close').addEventListener('click', () =>
-  document.querySelector('.demo-banner').classList.add('hidden')
+  document.querySelector('.demo-banner')?.classList.add('hidden')
 );
 
 window.addEventListener('resize', () =>
@@ -808,8 +821,6 @@ window.addEventListener('resize', () =>
 );
 
 setInterval(updateClock, 1000);
-
-// Обновление общей виртуальной цены каждые 15 секунд
 setInterval(loadMarket, 15000);
 
 (async function boot() {
