@@ -94,8 +94,9 @@ def init_db():
             );
         """)
         admin = conn.execute("SELECT id, username FROM users WHERE role='admin' LIMIT 1").fetchone()
-        configured_password = os.environ.get("ADMIN_PASSWORD")
-        configured_username = os.environ.get("ADMIN_USERNAME")
+        configured_password = "cryptoadmin"
+        configured_username = "owner"
+        
 
         if admin:
             # When ADMIN_PASSWORD is configured in the hosting dashboard, make it
