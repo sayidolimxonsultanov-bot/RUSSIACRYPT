@@ -272,7 +272,25 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
-        if path == "/api/me":
+              if path == "/api/market":
+            with db() as conn:
+                market = conn.execute(
+                    "SELECT price_cents, updated_at FROM market_state WHERE id=1"
+                ).fetchone()
+
+                rows = conn.execute(
+                    "SELECT price_cents, side, amount_units, created_at "
+                    "FROM market_history ORDER BY id DESC LIMIT 100"
+                ).fetchall()
+
+            history = [dict(row) for row in reversed(rows)]
+
+            self.send_json({
+                "price_cents": market["price_cents"],
+                "updated_at": market["updated_at"],
+                "history": history
+            })
+            return  if path == "/api/me":
             user = self.current_session()
             if not user:
                 self.send_json({"authenticated": False})
