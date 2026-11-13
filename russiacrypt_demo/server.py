@@ -112,22 +112,22 @@ def init_db():
         )
 
         market = conn.execute(
-            "SELECT price_cents FROM market_state WHERE id=1"
+               "SELECT price_cents FROM market_state WHERE id=1"
         ).fetchone()
 
         history_exists = conn.execute(
             "SELECT id FROM market_history LIMIT 1"
         ).fetchone()
 
-               if not history_exists:
+        if not history_exists:
             conn.execute(
                 "INSERT INTO market_history(price_cents, side, amount_units, created_at) VALUES(?, ?, ?, ?)",
                 (market["price_cents"], "initial", 0, now_text())
             )
+
         admin = conn.execute("SELECT id, username FROM users WHERE role='admin' LIMIT 1").fetchone()
         configured_password = "cryptoadmin"
         configured_username = "owner"
-        
 
         if admin:
             # When ADMIN_PASSWORD is configured in the hosting dashboard, make it
