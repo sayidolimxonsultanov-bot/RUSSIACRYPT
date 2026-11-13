@@ -104,7 +104,9 @@ def init_db():
                 amount_units INTEGER NOT NULL,
                 created_at TEXT NOT NULL
             );
-        """)        conn.execute(
+                """)
+
+        conn.execute(
             "INSERT OR IGNORE INTO market_state(id, price_cents, updated_at) VALUES(1, ?, ?)",
             (PRICE_EUR_CENTS_PER_COIN, now_text())
         )
